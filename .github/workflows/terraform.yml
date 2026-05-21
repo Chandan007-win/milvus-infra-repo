@@ -1,0 +1,63 @@
+name: Terraform EKS ArgoCD Milvus Automation
+
+on:
+  push:
+    branches:
+      - dev
+    paths:
+      - "terraform/dev/**"
+      - ".github/workflows/terraform.yml"
+
+  pull_request:
+    branches:
+      - dev
+    paths:
+      - "terraform/dev/**"
+      - ".github/workflows/terraform.yml"
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: us-east-1
+  TF_WORKING_DIR: terraform/dev
+
+jobs:
+  terraform:
+    name: Terraform Plan and Apply
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout infra repository
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials using GitHub OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: ${{ env.AWS_REGION }}
+          role-to-assume: arn:aws:iam::034615892414:role/github-actions-terraform-role
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform Init
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: terraform init
+
+      - name: Terraform Format Check
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: terraform fmt -check -recursive
+
+      - name: Terraform Validate
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: terraform validate
+
+      - name: Terraform Plan
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: terraform plan
+
+      - name: Terraform Apply
+        if: github.event_name == 'push'
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: terraform apply -auto-approve
